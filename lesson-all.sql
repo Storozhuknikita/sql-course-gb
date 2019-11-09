@@ -301,3 +301,94 @@ FROM orders
          RIGHT OUTER JOIN users
                           ON users.id = orders.user_id
 WHERE orders.id IS NULL;
+
+
+-- LESSON 10
+-- ТРАНЗАКЦИЯ ПО УДАЛЕНИЮ ПОЛЬЗОВАТЕЛЯ
+START TRANSACTION;
+
+SELECT @last_user_id := (select id from users where email = 'noel44@example.net');
+
+delete from profiles where user_id = @last_user_id;
+
+-- SET FOREIGN_KEY_CHECKS = 0;
+
+delete from users where id = @last_user_id;
+
+-- SET FOREIGN_KEY_CHECKS = 1;
+
+COMMIT;
+
+
+
+-- критерии выбора пользователей
+-- из одного города
+-- состоят в одной группе
+-- друзья друзей
+
+drop procedure if exists friendship_offers;
+delimiter //
+create procedure friendship_offers (in for_user_id int)
+begin
+    -- в одном городе
+    select p2.user_id from profiles as p
+        join profiles as p2 on p.hometown = p2.hometown
+    where p.user_id = for_user_id and p2.user_id <> for_user_id
+
+    union
+
+    -- состоят в одной группе
+    select uc2.user_id
+    from users_communities uc1
+             join users_communities uc2
+                  on uc1.community_id = uc2.community_id
+    where uc1.user_id = for_user_id
+      and uc2.user_id <> for_user_id
+
+    union
+
+    select fr3.target_user_id from friend_requests fr1
+    join friend_requests fr2
+        on (fr1.target_user_id = fr2.initiator_user_id or fr1.initiator_user_id = fr2.target_user_id)
+    join friend_requests fr3
+         on (fr3.target_user_id = fr2.initiator_user_id or fr3.initiator_user_id = fr2.target_user_id)
+    where (fr1.initiator_user_id = for_user_id or fr1.target_user_id = for_user_id)
+        and fr2.status = 'approved'
+        and fr3.status = 'approved'
+        and fr3.target_user_id <> for_user_id -- исключим себя
+    order by rand()
+    limit 5;
+
+
+end //
+delimiter ;
+call friendship_offers(3);
+
+
+-- процедура высчета рейтинга пользователя
+drop function if exists vk.friendship_direction;
+DELIMITER $$
+$$
+create definer = `root`@`localhost` function `vk`.`friendship_direction`(check_user_id int)
+RETURNS float
+    reads sql data
+BEGIN
+    declare requests_to_user INT;
+    declare requests_from_user INT;
+
+    set requests_to_user = (
+        select count (*)
+        from friend_requests
+        where target_user_id = 0);
+
+    set requests_from_user = (
+        select count(*)
+        from friend_requests
+        where initiator_user_id = 'check_user_id');
+
+    return requests_to_user / requests_from_user;
+
+END$$
+DELIMITER ;
+
+select vk.friendship_direction(1);
