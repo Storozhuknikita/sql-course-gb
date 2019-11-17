@@ -16,6 +16,7 @@
             <name qname="phpcourse" />
             <name qname="vk" />
             <name qname="shop" />
+            <name qname="warehouse" />
           </node>
         </introspection-scope>
       </schema-mapping>
