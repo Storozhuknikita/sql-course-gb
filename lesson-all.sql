@@ -392,3 +392,20 @@ END$$
 DELIMITER ;
 
 select vk.friendship_direction(1);
+
+
+## LESSON 12
+use vk;
+SELECT
+    media.filename,
+    media_types.name,
+    COUNT(*) AS total_likes,
+    CONCAT(firstname, '', lastname) AS owner,
+    hometown
+FROM media
+         join media_types ON media.media_type_id = media_types.id
+         join likes ON media.id = likes.media_id
+         join users ON users.id = media.user_id
+         join profiles ON users.id = profiles.user_id
+where users.id = 2
+group by media.id;
